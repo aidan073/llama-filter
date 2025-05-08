@@ -34,7 +34,7 @@ def get_model(token_or_env):
 
     return model, processor
 
-def filter(model, processor, metadata, prompt, output_path, threshold:int=0.5, save_every:int=None):
+def filter(model, processor, metadata, prompt, output_path, delim="\t", threshold:int=0.5, save_every:int=None):
     """
     Filter metadata file using an MLLM
     """
@@ -51,7 +51,7 @@ def filter(model, processor, metadata, prompt, output_path, threshold:int=0.5, s
     results = []
     since_last_save = 0
     samples = metadata.iterrows()
-    for idx, sample in tqdm(samples, total=len(samples), desc="Classifying Samples"):
+    for sample in tqdm(samples, total=len(samples), desc="Classifying Samples"):
         msg[0]["content"][1]["text"] = prompt.format(text=sample.loc("caption"))
         input_text = processor.apply_chat_template(msg, add_generation_prompt=True)
         input_image = Image.open(sample.loc("image_path"))
@@ -61,7 +61,7 @@ def filter(model, processor, metadata, prompt, output_path, threshold:int=0.5, s
 
         since_last_save += 1
         if save_every and since_last_save >= save_every:
-            metadata[results].to_csv(output_path, sep='\t', index=False, encoding='utf-8')
+            metadata[results].to_csv(output_path, sep=delim, index=False, encoding='utf-8')
             since_last_save = 0
 
     return results

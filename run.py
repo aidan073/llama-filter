@@ -6,18 +6,23 @@ import pandas as pd
 
 def get_args():
     parser = argparse.ArgumentParser(description="MLLM filter parser")
+
+    # required
     parser.add_argument("--token_or_env", "-t", help="Llama HF access token, or path to a .env file containing HF_TOKEN: <token>")
     parser.add_argument("--input_path", "-i", required=True, help="Path to metadata file")
     parser.add_argument("--prompt", "-p", required=True, help="Prompt for MLLM")
     parser.add_argument("--output_path", "-o", required=True, help="Path to save filtered metadata")
 
     # optional / defaults
-    parser.add_argument("--threshold", "-th", default=0.5, help="Confidence required for MLLM to predict 'true' (must be in range 0-1)")
-    parser.add_argument("--id_column", "-id", default=0, help="Name of metadata column with ids, or index of column with ids")
-    parser.add_argument("--caption_column", "-cap", default=1, help="Name of metadata column with captions, or index of column with captions")
-    parser.add_argument("--image_column", "-img", default=2, help="Name of metadata column with image paths, or index of column with image paths")
+    parser.add_argument("--threshold", "-th", type=float, default=0.5, help="Confidence required for MLLM to predict 'true' (must be in range 0-1)")
+    parser.add_argument("--id_column", "-id", type=str, default="0", help="Name of metadata column with ids, or index of column with ids")
+    parser.add_argument("--caption_column", "-cap", type=str, default="1", help="Name of metadata column with captions, or index of column with captions")
+    parser.add_argument("--image_column", "-img", type=str, default="2", help="Name of metadata column with image paths, or index of column with image paths")
     parser.add_argument("--save_every", "-s", type=int, help="How often to save the filtered dataset. If not provided, then dataset will only be saved at the end.")
     parser.add_argument("--has_header", "-h", action="store_true", help="If your dataset has a header row that needs to be skipped")
+
+    # advanced
+    parser.add_argument("--max_steps", "-m", type=int, default=10, help="Max number of classifier token generations before giving up and classifying as 'true'")
 
     return parser.parse_args()
 
@@ -51,8 +56,10 @@ def mllm_filter(args):
     if os.path.exists(args.output_path):
         raise FileExistsError(f"Designated output_path: {args.output_path} already exists. Please delete it or provide a different output_path.")
     
-    if args.output_path[-4:] != ".tsv" or args.output_path[-4:] != ".csv":
+    save_extension = args.output_path[-4:]
+    if save_extension != ".tsv" or save_extension != ".csv":
         raise NameError(f"Provided output_path: {args.output_path} must either be a .tsv or .csv file.")
+    delim = "\t" if save_extension == ".tsv" else ","
     
     output_dir = os.path.dirname(args.output_path)
     if output_dir:
@@ -61,7 +68,7 @@ def mllm_filter(args):
     metadata = load_dataset(args.input_path, args.id_column, args.caption_column, args.image_column, args.has_header)
     model, processor = mllm.get_model(args.token_or_env)
     model.eval()
-    mllm.filter(model, processor, metadata, args.prompt, args.output_path, args.save_every)
+    mllm.filter(model, processor, metadata, args.prompt, args.output_path, delim, args.threshold, args.save_every)
 
 if __name__ == "__main__":
     # remove any samples with corrupted images before running this.
