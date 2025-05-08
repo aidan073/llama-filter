@@ -14,7 +14,7 @@ def get_args():
     parser.add_argument("--output_path", "-o", required=True, help="Path to save filtered metadata")
 
     # optional / defaults
-    parser.add_argument("--threshold", "-th", type=float, default=0.5, help="Confidence required for MLLM to predict 'true' (must be in range 0-1)")
+    parser.add_argument("--threshold", "-th", type=float, default=0.5, help="Confidence required for MLLM to predict 'true' (Must follow constrain: 0 < threshold < 1)")
     parser.add_argument("--id_column", "-id", type=str, default="0", help="Name of metadata column with ids, or index of column with ids")
     parser.add_argument("--caption_column", "-cap", type=str, default="1", help="Name of metadata column with captions, or index of column with captions")
     parser.add_argument("--image_column", "-img", type=str, default="2", help="Name of metadata column with image paths, or index of column with image paths")
@@ -60,6 +60,9 @@ def mllm_filter(args):
     if save_extension != ".tsv" or save_extension != ".csv":
         raise NameError(f"Provided output_path: {args.output_path} must either be a .tsv or .csv file.")
     delim = "\t" if save_extension == ".tsv" else ","
+
+    if args.threshold > 1 or args.threshold < 0:
+        raise ValueError(f"Threshold value of {args.threshold} is invalid. Must follow constrain: 0 < threshold < 1.")
     
     output_dir = os.path.dirname(args.output_path)
     if output_dir:
