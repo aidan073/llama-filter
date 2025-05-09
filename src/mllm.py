@@ -51,19 +51,18 @@ def filter(model, processor, metadata, caption_column, image_column, prompt, out
     results = []
     since_last_save = 0
     for row in tqdm(metadata.itertuples(index=False), total=len(metadata), desc="Classifying Samples"):
-        if caption_column:
-            prompt.format(caption=getattr(row, caption_column))
-        msg[0]["content"][1]["text"] = prompt
+        formatted_prompt = prompt.format(caption=getattr(row, caption_column)) if caption_column else prompt
+        msg[0]["content"][1]["text"] = formatted_prompt
         input_text = processor.apply_chat_template(msg, add_generation_prompt=True)
-        input_image = Image.open(getattr(row, image_column))
-        input = processor(input_image, input_text, add_special_tokens=False, truncation=True, return_tensors="pt").to(device)
+        with Image.open(getattr(row, image_column)) as input_image:
+            input = processor(input_image, input_text, add_special_tokens=False, truncation=True, return_tensors="pt").to(device)
         results.append(classify(model, input, req_logit_diff, true_token_id, false_token_id, max_steps=max_steps, topk=topk))
-        input_image.close()
 
+        # safety
         since_last_save += 1
         if save_every and since_last_save >= save_every:
-            mask = results + [False] * (len(metadata) - len(results))
-            metadata[mask].to_csv(output_path, sep=delim, index=False, header=has_header, encoding='utf-8')
+            filtered_metadata = metadata.iloc[:len(results)][results]
+            filtered_metadata.to_csv(output_path, sep=delim, index=False, header=has_header, encoding='utf-8')
             print(f"Saved temporary filtered dataset to {output_path}")
             since_last_save = 0
 

@@ -15,7 +15,7 @@ def get_args():
     parser.add_argument("--image_column", "-img", type=_str_or_int, required=True, help="Name of metadata column with image paths, or index of column with image paths.")
 
     # optional / defaults
-    parser.add_argument("--threshold", "-th", type=float, default=0.5, help="Confidence required for MLLM to predict 'true' (Must follow constrain: 0 < threshold < 1)")
+    parser.add_argument("--threshold", "-th", type=float, default=0.5, help="Confidence required for MLLM to predict 'true' (Must follow constraint: 0 < threshold < 1)")
     parser.add_argument("--caption_column", "-cap", type=_str_or_int, default=None, help="Name of metadata column with captions, or index of column with captions.")
     parser.add_argument("--save_every", "-s", type=int, help="How often to save the filtered dataset. If not provided, then dataset will only be saved at the end.")
     parser.add_argument("--has_header", "-hd", action="store_true", help="If your dataset has a header row that needs to be skipped")
@@ -56,7 +56,7 @@ def mllm_filter(args):
     delim = "\t" if save_extension == ".tsv" else ","
 
     if args.threshold >= 1 or args.threshold <= 0:
-        raise ValueError(f"Threshold value of {args.threshold} is invalid. Must follow constrain: 0 < threshold < 1.")
+        raise ValueError(f"Threshold value of {args.threshold} is invalid. Must follow constraint: 0 < threshold < 1.")
     
     if not args.has_header and (isinstance(args.caption_column, str) or isinstance(args.image_column, str)):
         raise ValueError(f"If has_header is false, then caption_column and/or image_column must be indices, not strings.")
