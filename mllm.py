@@ -51,7 +51,9 @@ def filter(model, processor, metadata, caption_column, image_column, prompt, out
     results = []
     since_last_save = 0
     for row in tqdm(metadata.itertuples(index=False), total=len(metadata), desc="Classifying Samples"):
-        msg[0]["content"][1]["text"] = prompt.format(caption=getattr(row, caption_column))
+        if caption_column:
+            prompt.format(caption=getattr(row, caption_column))
+        msg[0]["content"][1]["text"] = prompt
         input_text = processor.apply_chat_template(msg, add_generation_prompt=True)
         input_image = Image.open(getattr(row, image_column))
         input = processor(input_image, input_text, add_special_tokens=False, truncation=True, return_tensors="pt").to(device)
@@ -62,6 +64,7 @@ def filter(model, processor, metadata, caption_column, image_column, prompt, out
         if save_every and since_last_save >= save_every:
             mask = results + [False] * (len(metadata) - len(results))
             metadata[mask].to_csv(output_path, sep=delim, index=False, header=has_header, encoding='utf-8')
+            print(f"Saved temporary filtered dataset to {output_path}")
             since_last_save = 0
 
     return results
@@ -78,6 +81,7 @@ def classify(model, input, req_logit_diff, id_1, id_0, max_steps=10, topk=1)->bo
         with torch.no_grad():
             output = model(**input)
             logits = output.logits[:, -1, :] # shape: (1, vocab_size)
+            # print(logits[:, [id_1, id_0]])
         
         if max_steps:
             topk_ids = torch.topk(logits, topk, dim=-1).indices[0].tolist()

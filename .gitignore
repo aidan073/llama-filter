@@ -2,3 +2,4 @@
 filter_venv/
 test_files/
 __pycache__/
+.vscode/

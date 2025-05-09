@@ -12,11 +12,11 @@ def get_args():
     parser.add_argument("--input_path", "-i", required=True, help="Path to metadata file")
     parser.add_argument("--prompt", "-p", required=True, help="Prompt for MLLM")
     parser.add_argument("--output_path", "-o", required=True, help="Path to save filtered metadata")
+    parser.add_argument("--image_column", "-img", type=_str_or_int, required=True, help="Name of metadata column with image paths, or index of column with image paths.")
 
     # optional / defaults
     parser.add_argument("--threshold", "-th", type=float, default=0.5, help="Confidence required for MLLM to predict 'true' (Must follow constrain: 0 < threshold < 1)")
-    parser.add_argument("--caption_column", "-cap", type=_str_or_int, default="1", help="Name of metadata column with captions, or index of column with captions")
-    parser.add_argument("--image_column", "-img", type=_str_or_int, default="2", help="Name of metadata column with image paths, or index of column with image paths")
+    parser.add_argument("--caption_column", "-cap", type=_str_or_int, default=None, help="Name of metadata column with captions, or index of column with captions.")
     parser.add_argument("--save_every", "-s", type=int, help="How often to save the filtered dataset. If not provided, then dataset will only be saved at the end.")
     parser.add_argument("--has_header", "-hd", action="store_true", help="If your dataset has a header row that needs to be skipped")
 
@@ -59,17 +59,20 @@ def mllm_filter(args):
         raise ValueError(f"Threshold value of {args.threshold} is invalid. Must follow constrain: 0 < threshold < 1.")
     
     if not args.has_header and (isinstance(args.caption_column, str) or isinstance(args.image_column, str)):
-        raise ValueError(f"If has_header is false, then caption_column and image_column must be indices, not strings.")
+        raise ValueError(f"If has_header is false, then caption_column and/or image_column must be indices, not strings.")
 
     output_dir = os.path.dirname(args.output_path)
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)
 
-    # load and filter
+    # load data
     metadata = load_dataset(args.input_path, args.has_header, load_delim)
-    if isinstance(args.caption_column, int):
-        args.caption_column = metadata.columns[args.caption_column]
+    if isinstance(args.image_column, int):
         args.image_column = metadata.columns[args.image_column]
+    if args.caption_column and isinstance(args.caption_column, int):
+        args.caption_column = metadata.columns[args.caption_column]
+
+    # filter
     model, processor = mllm.get_model(args.token_or_env)
     model.eval()
     results = mllm.filter(model=model, 
@@ -97,4 +100,5 @@ def _str_or_int(value):
 if __name__ == "__main__":
     # remove any samples with corrupted images before running this.
     args = get_args()
+    # args.prompt = args.prompt.replace("\\n", "\n") # for debugging with launch.json
     mllm_filter(args)
