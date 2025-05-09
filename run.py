@@ -8,7 +8,7 @@ def get_args():
     parser = argparse.ArgumentParser(description="MLLM filter parser")
 
     # required
-    parser.add_argument("--token_or_env", "-t", help="Llama HF access token, or path to a .env file containing HF_TOKEN: <token>")
+    parser.add_argument("--token_or_env", "-t", required=True, help="Llama HF access token, or path to a .env file containing HF_TOKEN: <token>")
     parser.add_argument("--input_path", "-i", required=True, help="Path to metadata file")
     parser.add_argument("--prompt", "-p", required=True, help="Prompt for MLLM")
     parser.add_argument("--output_path", "-o", required=True, help="Path to save filtered metadata")
@@ -23,6 +23,10 @@ def get_args():
     # advanced
     parser.add_argument("--max_steps", "-m", type=int, default=None, help="Max number of classifier token generations before giving up and classifying as 'true'. If None, it will always classify on the first try.")
     parser.add_argument("--top_k", "-tk", type=int, default=1, help="A classifier token (1 or 0) must appear in the top_k predicted tokens, otherwise continue generating to get a more accurate classification. Only relevant if max_steps != None.")
+
+    usage_string = parser.format_usage()
+    print("USAGE:")
+    print(usage_string)
 
     return parser.parse_args()
 
