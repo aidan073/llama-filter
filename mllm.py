@@ -34,7 +34,7 @@ def get_model(token_or_env):
 
     return model, processor
 
-def filter(model, processor, metadata, prompt, output_path, delim="\t", threshold:int=0.5, save_every:int=None):
+def filter(model, processor, metadata, caption_column, image_column, prompt, output_path, has_header, delim="\t", threshold:int=0.5, save_every:int=None, max_steps:int=10, topk:int=None):
     """
     Filter metadata file using an MLLM
     """
@@ -50,18 +50,18 @@ def filter(model, processor, metadata, prompt, output_path, delim="\t", threshol
     false_token_id = processor.tokenizer.convert_tokens_to_ids(processor.tokenizer.tokenize("0")[0])
     results = []
     since_last_save = 0
-    samples = metadata.iterrows()
-    for sample in tqdm(samples, total=len(samples), desc="Classifying Samples"):
-        msg[0]["content"][1]["text"] = prompt.format(text=sample.loc("caption"))
+    for row in tqdm(metadata.itertuples(index=False), total=len(metadata), desc="Classifying Samples"):
+        msg[0]["content"][1]["text"] = prompt.format(caption=getattr(row, caption_column))
         input_text = processor.apply_chat_template(msg, add_generation_prompt=True)
-        input_image = Image.open(sample.loc("image_path"))
+        input_image = Image.open(getattr(row, image_column))
         input = processor(input_image, input_text, add_special_tokens=False, truncation=True, return_tensors="pt").to(device)
-        results.append(classify(model, input, req_logit_diff, true_token_id, false_token_id, topk=1))
+        results.append(classify(model, input, req_logit_diff, true_token_id, false_token_id, max_steps=max_steps, topk=topk))
         input_image.close()
 
         since_last_save += 1
         if save_every and since_last_save >= save_every:
-            metadata[results].to_csv(output_path, sep=delim, index=False, encoding='utf-8')
+            mask = results + [False] * (len(metadata) - len(results))
+            metadata[mask].to_csv(output_path, sep=delim, index=False, header=has_header, encoding='utf-8')
             since_last_save = 0
 
     return results
@@ -72,33 +72,35 @@ def classify(model, input, req_logit_diff, id_1, id_0, max_steps=10, topk=1)->bo
     **only works for 1 sample at a time currently**
     """
     device = input["input_ids"].device
+    steps = 1 if max_steps is None else max_steps
 
-    for _ in range(max_steps):
+    for _ in range(steps):
         with torch.no_grad():
             output = model(**input)
             logits = output.logits[:, -1, :] # shape: (1, vocab_size)
+        
+        if max_steps:
+            topk_ids = torch.topk(logits, topk, dim=-1).indices[0].tolist()
+            # print(processor.tokenizer.decode(topk_ids[0]))
+            if id_1 not in topk_ids and id_0 not in topk_ids:
+                # Not ready for classification
+                # Append the most likely token and update attention masks
+                next_token_id = topk_ids[0]
+                next_token_tensor = torch.tensor([[next_token_id]], device=device)
+                input["input_ids"] = torch.cat([input["input_ids"], next_token_tensor], dim=1)
+                next_attention_mask = torch.ones_like(next_token_tensor)
+                input["attention_mask"] = torch.cat([input["attention_mask"], next_attention_mask], dim=1)
+                next_cross_attention_mask = torch.tensor([[[[1, 1, 0, 0]]]], device=device)
+                input["cross_attention_mask"] = torch.cat([input["cross_attention_mask"], next_cross_attention_mask], dim=1)
+                "[[[[1,1,0,0]]],[[[1,1,0,0]]],...]"
+                continue
+        
+        # Making a classification
+        target_logits = logits[:, [id_1, id_0]]
+        difference = target_logits[:, 0] - target_logits[:, 1]
+        prediction = difference >= req_logit_diff
 
-        topk_ids = torch.topk(logits, topk, dim=-1).indices[0].tolist()
-
-        if id_1 in topk_ids or id_0 in topk_ids:
-            target_logits = logits[:, [id_1, id_0]]
-            difference = target_logits[:, 0] - target_logits[:, 1]
-            prediction = difference >= req_logit_diff
-            # logit_pred = torch.nn.functional.softmax(target_logits, dim=1)
-            # prediction = True if logit_pred[0, 0] >= threshold else False
-
-            return prediction.item()
-
-        # Append the most likely token and update attention masks
-        next_token_id = topk_ids[0]
-        # print(processor.tokenizer.decode([next_token_id]))
-        next_token_tensor = torch.tensor([[next_token_id]], device=device)
-        input["input_ids"] = torch.cat([input["input_ids"], next_token_tensor], dim=1)
-        next_attention_mask = torch.ones_like(next_token_tensor)
-        input["attention_mask"] = torch.cat([input["attention_mask"], next_attention_mask], dim=1)
-        next_cross_attention_mask = torch.tensor([[[[1, 1, 0, 0]]]], device=device)
-        input["cross_attention_mask"] = torch.cat([input["cross_attention_mask"], next_cross_attention_mask], dim=1)
-        "[[[[1,1,0,0]]],[[[1,1,0,0]]],...]"
+        return prediction.item()
         
     print(f"Reached classification attempt limit of {max_steps}")
     return True
