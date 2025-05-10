@@ -1,4 +1,4 @@
-import src.mllm as mllm
+import src.filter as filter
 
 import os
 import argparse
@@ -12,11 +12,11 @@ def get_args():
     parser.add_argument("--input_path", "-i", required=True, help="Path to metadata file")
     parser.add_argument("--prompt", "-p", required=True, help="Prompt for MLLM")
     parser.add_argument("--output_path", "-o", required=True, help="Path to save filtered metadata")
-    parser.add_argument("--image_column", "-img", type=_str_or_int, required=True, help="Name of metadata column with image paths, or index of column with image paths.")
 
     # optional / defaults
-    parser.add_argument("--threshold", "-th", type=float, default=0.5, help="Confidence required for MLLM to predict 'true' (Must follow constraint: 0 < threshold < 1)")
+    parser.add_argument("--image_column", "-img", type=_str_or_int, default=None, help="Name of metadata column with image paths, or index of column with image paths.")
     parser.add_argument("--caption_column", "-cap", type=_str_or_int, default=None, help="Name of metadata column with captions, or index of column with captions.")
+    parser.add_argument("--threshold", "-th", type=float, default=0.5, help="Confidence required for MLLM to predict 'true' (Must follow constraint: 0 < threshold < 1)")
     parser.add_argument("--save_every", "-s", type=int, help="How often to save the filtered dataset. If not provided, then dataset will only be saved at the end.")
     parser.add_argument("--has_header", "-hd", action="store_true", help="If your dataset has a header row that needs to be skipped")
 
@@ -44,6 +44,9 @@ def mllm_filter(args):
 
     if os.path.exists(args.output_path):
         raise FileExistsError(f"Designated output_path: {args.output_path} already exists. Please delete it or provide a different output_path.")
+    
+    if not args.image_column and not args.caption_column:
+        raise argparse.ArgumentError(f"No value was provided for both image column and caption column. Please provide at least one of these.")
     
     load_extension = args.input_path[-4:]
     if load_extension != ".tsv" and load_extension != ".csv":
@@ -73,21 +76,37 @@ def mllm_filter(args):
         args.caption_column = metadata.columns[args.caption_column]
 
     # filter
-    model, processor = mllm.get_model(args.token_or_env)
+    vision = args.image_column != None
+    model, processor = filter.get_model(args.token_or_env, vision)
     model.eval()
-    results = mllm.filter(model=model, 
-                          processor=processor, 
-                          metadata=metadata, 
-                          caption_column=args.caption_column, 
-                          image_column=args.image_column, 
-                          prompt=args.prompt, 
-                          output_path=args.output_path,
-                          has_header=args.has_header,
-                          delim=delim, 
-                          threshold=args.threshold, 
-                          save_every=args.save_every, 
-                          max_steps=args.max_steps, 
-                          topk=args.top_k)
+    if vision:
+        results = filter.vision_filter(model=model, 
+                            processor=processor, 
+                            metadata=metadata, 
+                            caption_column=args.caption_column, 
+                            image_column=args.image_column, 
+                            prompt=args.prompt, 
+                            output_path=args.output_path,
+                            has_header=args.has_header,
+                            delim=delim, 
+                            threshold=args.threshold, 
+                            save_every=args.save_every, 
+                            max_steps=args.max_steps, 
+                            topk=args.top_k)
+    else:
+        results = filter.text_filter(model=model,
+                                     tokenizer=processor,
+                                     metadata=metadata,
+                                     caption_column=args.caption_column,
+                                     prompt=args.prompt, 
+                                     output_path=args.output_path,
+                                     has_header=args.has_header,
+                                     delim=delim, 
+                                     threshold=args.threshold, 
+                                     save_every=args.save_every, 
+                                     max_steps=args.max_steps, 
+                                     topk=args.top_k)
+        
     save_dataset(metadata, results, args.output_path, args.has_header, delim)
 
 def _str_or_int(value):
