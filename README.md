@@ -57,8 +57,8 @@ python -m src.run -t path/to/.env -i path/to/metadata.tsv -p "Caption: {caption}
 **-i:** Path to your dataset. Must be a .csv or .tsv file.  
 **-p:** Your prompt for llama. You MUST format the prompt so that it is asking llama to output a 1 (for true), and a 0 (for false). If you pass in a caption column with the -cap flag, you should have {caption} in your prompt where the caption should go.  
 **-o:** Path to save the filtered dataset. Must be a .csv or .tsv file.  
-**-img:** Name of the image column in your dataset. Alternatively, you can also pass in an int representing the location of the column (0 indexed). This is ideal for no header.  
-**-cap (optional):** Name/index of the caption column. If you do not need the captions in your prompt, you don't need the argument. If you do, then see "prompt requirements".  
+**-img (optional):** Name/index of the image column in your dataset. 
+**-cap (optional):** Name/index of the caption column in your dataset.  
 **-hd:** Include this flag if your dataset has a header row.  
   
 **Extra args:**  
