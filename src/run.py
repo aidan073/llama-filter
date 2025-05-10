@@ -34,8 +34,8 @@ def load_dataset(metadata, has_header, delim) -> pd.DataFrame:
         df.columns = [f"col_{i}" for i in range(df.shape[1])]
     return df
 
-def save_dataset(metadata, results, output_path, has_header, delim):
-    metadata[results].to_csv(output_path, sep=delim, index=False, header=has_header, encoding='utf-8')
+def save_dataset(metadata, output_path, has_header, delim):
+    metadata.to_csv(output_path, sep=delim, index=False, header=has_header, encoding='utf-8')
     print(f"Saved filtered dataset to {output_path}")
 
 def mllm_filter(args):
@@ -82,7 +82,7 @@ def mllm_filter(args):
     model.eval()
     corrupted = 0
     if vision:
-        results, filtered, corrupted = filter.vision_filter(model=model, 
+        results, corrupted = filter.vision_filter(model=model, 
                                         processor=processor, 
                                         metadata=metadata, 
                                         caption_column=args.caption_column, 
@@ -97,7 +97,7 @@ def mllm_filter(args):
                                         topk=args.top_k,
                                         keep_corrupted=args.keep_corrupted)
     else:
-        results, filtered = filter.text_filter(model=model,
+        results = filter.text_filter(model=model,
                                 tokenizer=processor,
                                 metadata=metadata,
                                 caption_column=args.caption_column,
@@ -110,12 +110,15 @@ def mllm_filter(args):
                                 max_steps=args.max_steps, 
                                 topk=args.top_k)
 
-    # print filter stats
-    print(f"\nFiltered out {filtered} samples.")
+    # print filter stats and save dataset
+    filtered_dataset = metadata[results]
+    if args.keep_corrupted:
+        corrupted = 0
+    filtered_count = len(metadata) - len(filtered_dataset) - corrupted
+    print(f"\nFiltered out {filtered_count} samples.")
     if not args.keep_corrupted and corrupted:
         print(f"Removed an additional {corrupted} samples that were missing or corrupted.")
-    
-    save_dataset(metadata, results, args.output_path, args.has_header, delim)
+    save_dataset(filtered_dataset, args.output_path, args.has_header, delim)
 
 def _str_or_int(value):
     # to allow column name or column index

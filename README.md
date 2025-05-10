@@ -32,7 +32,7 @@ If you use "-cap" flag only (no -img) → filters based on captions using llama3
 
 ### Basic Usage
 ```
-python -m src.run -t TOKEN_OR_ENV -i INPUT_PATH -p PROMPT -o OUTPUT_PATH -img IMAGE_PATH_COLUMN [-cap CAPTION_COLUMN] [-hd (if input data has a header)]
+python -m src.run -t TOKEN_OR_ENV -i INPUT_PATH -p PROMPT -o OUTPUT_PATH [-img IMAGE_PATH_COLUMN] [-cap CAPTION_COLUMN] [-hd (if input data has a header)]
 ```
 1. Image Only filtering example:
 ```
@@ -49,7 +49,7 @@ python -m src.run -t path/to/.env -i path/to/dataset.tsv -p "Caption: {caption}\
 
 ### Full Usage
 ```
-python -m src.run -t TOKEN_OR_ENV -i INPUT_PATH -p PROMPT -o OUTPUT_PATH -img IMAGE_PATH_COLUMN [-cap CAPTION_COLUMN] [-hd (if input data has a header)] [-th THRESHOLD] [-s SAVE_EVERY] [-k KEEP_CORRUPTED] [-m MAX_STEPS] [-tk TOP_K]
+python -m src.run -t TOKEN_OR_ENV -i INPUT_PATH -p PROMPT -o OUTPUT_PATH [-img IMAGE_PATH_COLUMN] [-cap CAPTION_COLUMN] [-hd (if input data has a header)] [-th THRESHOLD] [-s SAVE_EVERY] [-k KEEP_CORRUPTED] [-m MAX_STEPS] [-tk TOP_K]
 ```
 Example:
 ```

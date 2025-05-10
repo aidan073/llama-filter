@@ -87,7 +87,7 @@ def vision_filter(model, processor, metadata, caption_column, image_column, prom
 
         results.append(vision_classify(model, input, req_logit_diff, true_token_id, false_token_id, max_steps=max_steps, topk=topk))
 
-    return results, len(results) - len(metadata), missing_or_corrupted
+    return results, missing_or_corrupted
 
 def text_filter(model, tokenizer, metadata, caption_column, prompt, output_path, has_header, delim="\t", threshold:int=0.5, save_every:int=None, max_steps:int=10, topk:int=None):
     """
@@ -117,7 +117,7 @@ def text_filter(model, tokenizer, metadata, caption_column, prompt, output_path,
         input = tokenizer.apply_chat_template(msg, add_generation_prompt=True, return_tensors="pt").to(device)
         results.append(text_classify(model, input, req_logit_diff, true_token_id, false_token_id, max_steps=max_steps, topk=topk))
 
-    return results, len(results) - len(metadata)
+    return results
 
 def vision_classify(model, input, req_logit_diff, id_1, id_0, max_steps=10, topk=1)->bool:
     """
