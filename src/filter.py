@@ -1,7 +1,7 @@
 import os
 import torch
 from tqdm import tqdm
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 from dotenv import load_dotenv
 from huggingface_hub import login
 from transformers import MllamaForConditionalGeneration, AutoProcessor, AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
@@ -41,9 +41,9 @@ def get_model(token_or_env, vision=True):
 
     return model, processor
 
-def vision_filter(model, processor, metadata, caption_column, image_column, prompt, output_path, has_header, delim="\t", threshold:int=0.5, save_every:int=None, max_steps:int=10, topk:int=None):
+def vision_filter(model, processor, metadata, caption_column, image_column, prompt, output_path, has_header, delim="\t", threshold:int=0.5, save_every:int=None, max_steps:int=10, topk:int=None, keep_corrupted:bool=False):
     """
-    Filter metadata file using an MLLM
+    Filter a dataset using an MLLM
     """
     msg = [
         {"role": "user", "content": [
@@ -57,27 +57,41 @@ def vision_filter(model, processor, metadata, caption_column, image_column, prom
     false_token_id = processor.tokenizer.convert_tokens_to_ids(processor.tokenizer.tokenize("0")[0])
     results = []
     since_last_save = 0
+    missing_or_corrupted = 0
     for row in tqdm(metadata.itertuples(index=False), total=len(metadata), desc="Classifying Samples"):
-        formatted_prompt = prompt.format(caption=getattr(row, caption_column)) if caption_column else prompt
-        msg[0]["content"][1]["text"] = formatted_prompt
-        input_text = processor.apply_chat_template(msg, add_generation_prompt=True)
-        with Image.open(getattr(row, image_column)) as input_image:
-            input = processor(input_image, input_text, add_special_tokens=False, truncation=True, return_tensors="pt").to(device)
-        results.append(vision_classify(model, input, req_logit_diff, true_token_id, false_token_id, max_steps=max_steps, topk=topk))
-
-        # safety
-        since_last_save += 1
+        # safety saving
         if save_every and since_last_save >= save_every:
             filtered_metadata = metadata.iloc[:len(results)][results]
             filtered_metadata.to_csv(output_path, sep=delim, index=False, header=has_header, encoding='utf-8')
             print(f"Saved temporary filtered dataset to {output_path}")
             since_last_save = 0
+        since_last_save += 1
 
-    return results
+        # filtering
+        formatted_prompt = prompt.format(caption=getattr(row, caption_column)) if caption_column else prompt
+        msg[0]["content"][1]["text"] = formatted_prompt
+        input_text = processor.apply_chat_template(msg, add_generation_prompt=True)
+        try:
+            with Image.open(getattr(row, image_column)) as input_image:
+                input = processor(input_image, input_text, add_special_tokens=False, truncation=True, return_tensors="pt").to(device)
+        except FileNotFoundError:
+            print(f"Image {getattr(row, image_column)} is missing.")
+            missing_or_corrupted += 1
+            results.append(keep_corrupted)
+            continue
+        except UnidentifiedImageError:
+            print(f"Image {getattr(row, image_column)} is corrupted.")
+            missing_or_corrupted += 1
+            results.append(keep_corrupted)
+            continue
+
+        results.append(vision_classify(model, input, req_logit_diff, true_token_id, false_token_id, max_steps=max_steps, topk=topk))
+
+    return results, len(results) - len(metadata), missing_or_corrupted
 
 def text_filter(model, tokenizer, metadata, caption_column, prompt, output_path, has_header, delim="\t", threshold:int=0.5, save_every:int=None, max_steps:int=10, topk:int=None):
     """
-    Filter metadata file using an LLM
+    Filter a dataset using an LLM
     """
     msg = [
         {"role": "system", "content": "You are an AI assistant that follows the user's directions."},
@@ -90,20 +104,20 @@ def text_filter(model, tokenizer, metadata, caption_column, prompt, output_path,
     results = []
     since_last_save = 0
     for row in tqdm(metadata.itertuples(index=False), total=len(metadata), desc="Classifying Samples"):
-        formatted_prompt = prompt.format(caption=getattr(row, caption_column))
-        msg[1]["content"] = formatted_prompt
-        input = tokenizer.apply_chat_template(msg, add_generation_prompt=True, return_tensors="pt").to(device)
-        results.append(text_classify(model, input, req_logit_diff, true_token_id, false_token_id, max_steps=max_steps, topk=topk))
-
-        # safety
-        since_last_save += 1
+        # safety saving
         if save_every and since_last_save >= save_every:
             filtered_metadata = metadata.iloc[:len(results)][results]
             filtered_metadata.to_csv(output_path, sep=delim, index=False, header=has_header, encoding='utf-8')
             print(f"Saved temporary filtered dataset to {output_path}")
             since_last_save = 0
+        since_last_save += 1
+        
+        formatted_prompt = prompt.format(caption=getattr(row, caption_column))
+        msg[1]["content"] = formatted_prompt
+        input = tokenizer.apply_chat_template(msg, add_generation_prompt=True, return_tensors="pt").to(device)
+        results.append(text_classify(model, input, req_logit_diff, true_token_id, false_token_id, max_steps=max_steps, topk=topk))
 
-    return results
+    return results, len(results) - len(metadata)
 
 def vision_classify(model, input, req_logit_diff, id_1, id_0, max_steps=10, topk=1)->bool:
     """

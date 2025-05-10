@@ -9,20 +9,21 @@ def get_args():
 
     # required
     parser.add_argument("--token_or_env", "-t", required=True, help="Llama HF access token, or path to a .env file containing HF_TOKEN: <token>")
-    parser.add_argument("--input_path", "-i", required=True, help="Path to metadata file")
+    parser.add_argument("--input_path", "-i", required=True, help="Path to dataset file")
     parser.add_argument("--prompt", "-p", required=True, help="Prompt for MLLM")
-    parser.add_argument("--output_path", "-o", required=True, help="Path to save filtered metadata")
+    parser.add_argument("--output_path", "-o", required=True, help="Path to save filtered dataset")
 
     # optional / defaults
-    parser.add_argument("--image_column", "-img", type=_str_or_int, default=None, help="Name of metadata column with image paths, or index of column with image paths.")
-    parser.add_argument("--caption_column", "-cap", type=_str_or_int, default=None, help="Name of metadata column with captions, or index of column with captions.")
+    parser.add_argument("--image_column", "-img", type=_str_or_int, default=None, help="Name of dataset column with image paths, or index of column with image paths")
+    parser.add_argument("--caption_column", "-cap", type=_str_or_int, default=None, help="Name of dataset column with captions, or index of column with captions")
     parser.add_argument("--threshold", "-th", type=float, default=0.5, help="Confidence required for MLLM to predict 'true' (Must follow constraint: 0 < threshold < 1)")
-    parser.add_argument("--save_every", "-s", type=int, help="How often to save the filtered dataset. If not provided, then dataset will only be saved at the end.")
+    parser.add_argument("--save_every", "-s", type=int, help="How often to save the filtered dataset. If not provided, then dataset will only be saved at the end")
     parser.add_argument("--has_header", "-hd", action="store_true", help="If your dataset has a header row that needs to be skipped")
+    parser.add_argument("--keep_corrupted", "-k", action="store_true", help="Will keep samples with corrupted/missing images")
 
     # advanced
-    parser.add_argument("--max_steps", "-m", type=int, default=None, help="Max number of classifier token generations before giving up and classifying as 'true'. If None, it will always classify on the first try.")
-    parser.add_argument("--top_k", "-tk", type=int, default=1, help="A classifier token (1 or 0) must appear in the top_k predicted tokens, otherwise continue generating to get a more accurate classification. Only relevant if max_steps != None.")
+    parser.add_argument("--max_steps", "-m", type=int, default=None, help="Max number of classifier token generations before giving up and classifying as 'true'. If None, it will always classify on the first try")
+    parser.add_argument("--top_k", "-tk", type=int, default=1, help="A classifier token (1 or 0) must appear in the top_k predicted tokens, otherwise continue generating to get a more accurate classification. Only relevant if max_steps != None")
 
     return parser.parse_args()
 
@@ -72,41 +73,48 @@ def mllm_filter(args):
     metadata = load_dataset(args.input_path, args.has_header, load_delim)
     if isinstance(args.image_column, int):
         args.image_column = metadata.columns[args.image_column]
-    if args.caption_column and isinstance(args.caption_column, int):
+    if isinstance(args.caption_column, int):
         args.caption_column = metadata.columns[args.caption_column]
 
     # filter
     vision = args.image_column != None
     model, processor = filter.get_model(args.token_or_env, vision)
     model.eval()
+    corrupted = 0
     if vision:
-        results = filter.vision_filter(model=model, 
-                            processor=processor, 
-                            metadata=metadata, 
-                            caption_column=args.caption_column, 
-                            image_column=args.image_column, 
-                            prompt=args.prompt, 
-                            output_path=args.output_path,
-                            has_header=args.has_header,
-                            delim=delim, 
-                            threshold=args.threshold, 
-                            save_every=args.save_every, 
-                            max_steps=args.max_steps, 
-                            topk=args.top_k)
+        results, filtered, corrupted = filter.vision_filter(model=model, 
+                                        processor=processor, 
+                                        metadata=metadata, 
+                                        caption_column=args.caption_column, 
+                                        image_column=args.image_column, 
+                                        prompt=args.prompt, 
+                                        output_path=args.output_path,
+                                        has_header=args.has_header,
+                                        delim=delim, 
+                                        threshold=args.threshold, 
+                                        save_every=args.save_every, 
+                                        max_steps=args.max_steps, 
+                                        topk=args.top_k,
+                                        keep_corrupted=args.keep_corrupted)
     else:
-        results = filter.text_filter(model=model,
-                                     tokenizer=processor,
-                                     metadata=metadata,
-                                     caption_column=args.caption_column,
-                                     prompt=args.prompt, 
-                                     output_path=args.output_path,
-                                     has_header=args.has_header,
-                                     delim=delim, 
-                                     threshold=args.threshold, 
-                                     save_every=args.save_every, 
-                                     max_steps=args.max_steps, 
-                                     topk=args.top_k)
-        
+        results, filtered = filter.text_filter(model=model,
+                                tokenizer=processor,
+                                metadata=metadata,
+                                caption_column=args.caption_column,
+                                prompt=args.prompt, 
+                                output_path=args.output_path,
+                                has_header=args.has_header,
+                                delim=delim, 
+                                threshold=args.threshold, 
+                                save_every=args.save_every, 
+                                max_steps=args.max_steps, 
+                                topk=args.top_k)
+
+    # print filter stats
+    print(f"\nFiltered out {filtered} samples.")
+    if not args.keep_corrupted and corrupted:
+        print(f"Removed an additional {corrupted} samples that were missing or corrupted.")
+    
     save_dataset(metadata, results, args.output_path, args.has_header, delim)
 
 def _str_or_int(value):
