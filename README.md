@@ -11,8 +11,12 @@ This project has only been tested for Python 3.10.12. To get started:
 git clone https://github.com/aidan073/mllm-filter.git
 pip install -r requirements.txt
 ```
-
-## Usage
+  
+**Example Videos:**  
+[Usage & Examples](https://www.youtube.com/watch?v=1YmtW7nWifo)  
+[(extra) Threshold Argument Explanation](https://www.youtube.com/watch?v=hePC_rnJaWM)  
+  
+## Usage  
 **Prompt requirements:** You MUST format the prompt so that it is asking llama to output a 1 (for true), and a 0 (for false). False samples will be filtered out, while true samples will be kept. I strongly suggest you include "only output the number and nothing else" in your prompt, to avoid skewing the logits towards other tokens such as the bot_token. If you pass in a caption column with the -cap flag, you should have {caption} in your prompt wherever the caption should go.
 
 ### Basic Usage
