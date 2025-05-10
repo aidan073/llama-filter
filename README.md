@@ -58,7 +58,7 @@ python -m src.run -t path/to/.env -i path/to/dataset.tsv -p "Caption: {caption}\
 
 ### Argument Explanations  
 **Key args:**  
-**-t:** You must provide a hugging face token with access to llama 3.2. You can directly pass the token, or a .env containing HF_TOKEN variable.  
+**-t:** You must provide a hugging face token with access to llama 3.1 and 3.2. You can directly pass the token, or a .env containing HF_TOKEN variable.  
 **-i:** Path to your dataset. Must be a .csv or .tsv file.  
 **-p:** Your prompt for llama. You MUST format the prompt so that it is asking llama to output a 1 (for true), and a 0 (for false). If you pass in a caption column with the -cap flag, you should have {caption} in your prompt where the caption should go.  
 **-o:** Path to save the filtered dataset. Must be a .csv or .tsv file.  
