@@ -1,44 +1,54 @@
-# MLLM Filtering
+# Llama Filtering
 
 ## Description
-This script allows you to filter a dataset using Llama3.2-Vision with a single command.
+This script allows you to filter a dataset using Llama with a single command.
 
 ## Installation
 
 This project has only been tested for Python 3.10.12. To get started:
 
 ```
-git clone https://github.com/aidan073/mllm-filter.git
+git clone https://github.com/aidan073/llama-filter.git
 pip install -r requirements.txt
+cd path/to/llama-filter
 ```
   
 **Example Videos:**  
-[Usage & Examples](https://www.youtube.com/watch?v=1YmtW7nWifo)  
+[Usage & Examples](https://www.youtube.com/watch?v=Vhy5E8jTCWs)  
 [(extra) Threshold Argument Explanation](https://www.youtube.com/watch?v=hePC_rnJaWM)  
   
 ## Usage  
-**Prompt requirements:** You MUST format the prompt so that it is asking llama to output a 1 (for true), and a 0 (for false). False samples will be filtered out, while true samples will be kept. I strongly suggest you include "only output the number and nothing else" in your prompt, to avoid skewing the logits towards other tokens such as the bot_token. If you pass in a caption column with the -cap flag, you should have {caption} in your prompt wherever the caption should go.
+**Prompt requirements:** You MUST format the prompt so that it is asking llama to output a 1 (for true), and a 0 (for false). False samples will be filtered out, while true samples will be kept. I strongly suggest you include "only output the number and nothing else" in your prompt, to avoid skewing the logits towards other tokens such as the bot_token. If you pass in a caption column with the -cap flag, you should have {caption} in your prompt wherever the caption should go.  
+  
+**filtering types:**  
+1. -img flag but no -cap flag = image filter mode (llama3.2-vision).  
+2. -img flag and -cap flag = image+caption filter mode (llama3.2-vision).  
+3. -cap flag but no -img flag = caption filter mode (llama3.1).
 
 ### Basic Usage
 ```
-python -m src.run -t TOKEN_OR_ENV -i INPUT_PATH -p PROMPT -o OUTPUT_PATH -img IMAGE_COLUMN [-cap CAPTION_COLUMN] [-hd (if input data has a header)]
+python -m src.run -t TOKEN_OR_ENV -i INPUT_PATH -p PROMPT -o OUTPUT_PATH -img IMAGE_PATH_COLUMN [-cap CAPTION_COLUMN] [-hd (if input data has a header)]
 ```
-Example without caption:
+Image filtering example:
 ```
-python -m src.run -t path/to/.env -i path/to/metadata.tsv -p "If the image contains a dog output 1, else output 0." -o path/to/output.tsv -img image_path -hd
+python -m src.run -t path/to/.env -i path/to/metadata.tsv -p "If the image contains a dog output 1, else output 0." -o path/to/output.tsv -img image_path_column -hd
 ```
-Example with caption:
+Image+caption filtering example:
 ```
-python -m src.run -t path/to/.env -i path/to/metadata.tsv -p "Caption: {caption}\n\nOutput 1 if the caption matches the image, else output 0." -o path/to/output.tsv -img image_path -cap caption -hd
+python -m src.run -t path/to/.env -i path/to/metadata.tsv -p "Caption: {caption}\n\nOutput 1 if the caption matches the image, else output 0." -o path/to/output.tsv -img image_path_column -cap caption_column -hd
+```  
+Caption filtering example:   
+```
+python -m src.run -t path/to/.env -i path/to/metadata.tsv -p "Caption: {caption}\n\nOutput 1 if this caption is related to math. Output 0 if this caption is not related to math." -o path/to/output.tsv -cap caption_column -hd
 ```
 
 ### Full Usage
 ```
-python -m src.run -t TOKEN_OR_ENV -i INPUT_PATH -p PROMPT -o OUTPUT_PATH -img IMAGE_COLUMN [-cap CAPTION_COLUMN] [-hd (if input data has a header)] [-th THRESHOLD] [-s SAVE_EVERY] [-m MAX_STEPS] [-tk TOP_K]
+python -m src.run -t TOKEN_OR_ENV -i INPUT_PATH -p PROMPT -o OUTPUT_PATH -img IMAGE_PATH_COLUMN [-cap CAPTION_COLUMN] [-hd (if input data has a header)] [-th THRESHOLD] [-s SAVE_EVERY] [-m MAX_STEPS] [-tk TOP_K]
 ```
 Example:
 ```
-python -m src.run -t path/to/.env -i path/to/metadata.tsv -p "Caption: {caption}\n\nOutput 1 if the caption matches the image, else output 0. Only output the number and no extra text." -o path/to/output.tsv -img img_p -cap caption -hd -th 0.6 -s 1000 -m 5 -tk 1
+python -m src.run -t path/to/.env -i path/to/metadata.tsv -p "Caption: {caption}\n\nOutput 1 if the caption matches the image, else output 0. Only output the number and no extra text." -o path/to/output.tsv -img image_path_column -cap caption_column -hd -th 0.6 -s 1000 -m 5 -tk 1
 ```
 
 ### Argument Explanations  
