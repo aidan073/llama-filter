@@ -128,7 +128,6 @@ def _str_or_int(value):
         return value
 
 if __name__ == "__main__":
-    # remove any samples with corrupted images before running this.
     args = get_args()
     # args.prompt = args.prompt.replace("\\n", "\n") # for debugging with launch.json
     mllm_filter(args)
